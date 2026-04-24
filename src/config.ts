@@ -1,1 +1,1 @@
-export const BACKEND_URL = "https://backend-s16j.vercel.app/"
+export const BACKEND_URL = "https://backend-vcxg.onrender.com"

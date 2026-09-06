@@ -4,32 +4,42 @@ interface SidebarItemProps {
   text: string;
   icon: ReactElement;
   active?: boolean;
+  count?: number;
   onClick: () => void;
 }
 
-export const SidebarItem = ({ text, icon, active, onClick }: SidebarItemProps) => {
+export const SidebarItem = ({ text, icon, active, count, onClick }: SidebarItemProps) => {
   return (
-    <div 
+    <button
+      type="button"
       onClick={onClick}
-      className={`relative flex items-center gap-4 px-6 py-3 mx-3 my-0.5 rounded-xl cursor-pointer transition-all duration-200 group
-        ${active 
-          ? 'bg-cyan-500/10 text-cyan-300' 
-          : 'text-slate-400 hover:bg-white/[0.03] hover:text-slate-200'
-        }
-      `}
+      aria-current={active ? "page" : undefined}
+      className={`group relative mx-3 my-0.5 flex w-[calc(100%-1.5rem)] items-center gap-3 rounded-xl px-3.5 py-2.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+        ${active
+          ? "bg-accent-soft text-accent"
+          : "text-muted hover:bg-surface-2 hover:text-fg"
+        }`}
     >
-      {/* Active indicator bar */}
       {active && (
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-gradient-to-b from-cyan-400 to-violet-400 rounded-full" />
+        <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-accent" />
       )}
-
-      <div className={`text-lg transition-all duration-200 group-hover:scale-110 
-        ${active ? 'text-cyan-400' : 'text-slate-500 group-hover:text-cyan-400'}`}>
+      <span
+        className={`text-base transition-transform duration-200 group-hover:scale-110 ${
+          active ? "text-accent" : "text-subtle group-hover:text-fg"
+        }`}
+      >
         {icon}
-      </div>
-      <div className={`font-medium text-sm ${active ? 'text-cyan-300' : ''}`}>
-        {text}
-      </div>  
-    </div>
-  )
-}
+      </span>
+      <span className="flex-1 truncate text-sm font-medium">{text}</span>
+      {typeof count === "number" && count > 0 && (
+        <span
+          className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+            active ? "bg-accent/15 text-accent" : "bg-surface-2 text-subtle"
+          }`}
+        >
+          {count}
+        </span>
+      )}
+    </button>
+  );
+};

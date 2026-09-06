@@ -1,78 +1,71 @@
-import Dashboard from "./pages/Dashboard";
-import { Signin } from "./pages/Signin";
-import { Signup } from "./pages/Signup";
-import { SharedBrain } from "./pages/SharedBrain";
+import { lazy, Suspense } from "react";
 import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { MotionConfig } from "framer-motion";
 import { Toaster } from "sonner";
-import { FaBrain } from "react-icons/fa";
+import { LuBrain } from "react-icons/lu";
+
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ThemeProvider, useTheme } from "./context/ThemeContext";
+
+const Landing = lazy(() => import("./pages/Landing").then((m) => ({ default: m.Landing })));
+const Signin = lazy(() => import("./pages/Signin").then((m) => ({ default: m.Signin })));
+const Signup = lazy(() => import("./pages/Signup").then((m) => ({ default: m.Signup })));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const SharedBrain = lazy(() => import("./pages/SharedBrain").then((m) => ({ default: m.SharedBrain })));
+const NotFound = lazy(() => import("./pages/NotFound").then((m) => ({ default: m.NotFound })));
+
+const FullPageLoader = () => (
+  <div className="grid min-h-screen place-items-center">
+    <div className="ambient" />
+    <div className="relative z-10 flex flex-col items-center gap-4">
+      <div className="grid h-12 w-12 animate-pulse place-items-center rounded-2xl bg-accent-soft text-accent">
+        <LuBrain size={22} />
+      </div>
+      <span className="text-sm text-subtle">Loading Cluttr…</span>
+    </div>
+  </div>
+);
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { token, isLoading } = useAuth();
-  
-  if (isLoading) return (
-    <div className="h-screen w-screen flex flex-col items-center justify-center gap-4">
-      <div className="mesh-gradient" />
-      <div className="noise-overlay" />
-      <div className="relative z-10 flex flex-col items-center gap-4">
-        <div className="relative">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-violet-500/10 flex items-center justify-center animate-pulse">
-            <FaBrain className="text-cyan-400 text-2xl" />
-          </div>
-          <div className="absolute inset-0 w-14 h-14 rounded-2xl border-2 border-cyan-500/20 border-t-cyan-500 animate-[spin-slow_2s_linear_infinite]" />
-        </div>
-        <span className="text-sm text-slate-500 animate-pulse tracking-wide">Loading Cluttr...</span>
-      </div>
-    </div>
-  );
-  if (!token) return <Navigate to="/signin" />;
-  
+  if (isLoading) return <FullPageLoader />;
+  if (!token) return <Navigate to="/signin" replace />;
   return <>{children}</>;
 };
 
-const Layout = () => {
+const AppRoutes = () => {
   const { token } = useAuth();
   return (
-    <Routes>
-      <Route path="/signup" element={token ? <Navigate to="/dashboard" /> : <Signup />} />
-      <Route path="/signin" element={token ? <Navigate to="/dashboard" /> : <Signin />} />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="/share/:hash" element={<SharedBrain />} />
-      <Route
-        path="/"
-        element={<Navigate to="/dashboard" />}
-      />
-    </Routes>
+    <Suspense fallback={<FullPageLoader />}>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/signin" element={token ? <Navigate to="/dashboard" replace /> : <Signin />} />
+        <Route path="/signup" element={token ? <Navigate to="/dashboard" replace /> : <Signup />} />
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/share/:hash" element={<SharedBrain />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
   );
+};
+
+const ThemedToaster = () => {
+  const { resolved } = useTheme();
+  return <Toaster position="bottom-right" richColors theme={resolved} closeButton />;
 };
 
 function App() {
   return (
-    <AuthProvider>
-      <Toaster 
-        position="bottom-right" 
-        richColors 
-        theme="dark" 
-        toastOptions={{
-          style: {
-            background: 'rgba(15, 23, 42, 0.8)',
-            backdropFilter: 'blur(24px)',
-            border: '1px solid rgba(51, 65, 85, 0.5)',
-            color: '#f1f5f9',
-          }
-        }}
-      />
-      <Router>
-        <Layout />
-      </Router>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <MotionConfig reducedMotion="user">
+          <ThemedToaster />
+          <Router>
+            <AppRoutes />
+          </Router>
+        </MotionConfig>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

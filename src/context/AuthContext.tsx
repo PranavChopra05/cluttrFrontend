@@ -10,7 +10,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (token: string) => void;
+  login: (token: string, user?: User) => void;
   logout: () => void;
 }
 
@@ -21,29 +21,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchUser = async () => {
-    try {
-      const res = await api.get("/api/v1/me");
-      setUser(res.data.user);
-    } catch (err) {
-      console.error("Failed to fetch user", err);
-      logout();
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let cancelled = false;
+    const fetchUser = async () => {
+      try {
+        const res = await api.get("/api/v1/me");
+        if (!cancelled) setUser(res.data.user);
+      } catch (err) {
+        console.error("Failed to fetch user", err);
+        if (!cancelled) logout();
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
     if (token) {
       fetchUser();
     } else {
       setIsLoading(false);
     }
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
-  const login = (newToken: string) => {
+  const login = (newToken: string, newUser?: User) => {
     localStorage.setItem("token", newToken);
     setToken(newToken);
+    if (newUser) setUser(newUser);
   };
 
   const logout = () => {
@@ -59,6 +64,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
+// Hook is intentionally co-located with its provider (standard React pattern).
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

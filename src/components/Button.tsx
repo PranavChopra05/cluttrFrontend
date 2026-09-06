@@ -1,39 +1,80 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
+
+type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Size = "sm" | "md" | "lg";
 
 interface ButtonProps {
-    variant: "primary" | "secondary" | "danger";
-    text: string;
-    startIcon?: ReactElement;
-    onClick?: () => void;
-    fullWidth?: boolean;
-    isLoading?: boolean;
-    type?: "button" | "submit";
+  variant?: Variant;
+  size?: Size;
+  text?: string;
+  children?: ReactNode;
+  startIcon?: ReactElement;
+  endIcon?: ReactElement;
+  onClick?: () => void;
+  fullWidth?: boolean;
+  isLoading?: boolean;
+  disabled?: boolean;
+  type?: "button" | "submit";
+  title?: string;
+  "aria-label"?: string;
 }
 
-const variantStyles = {
-    "primary": "bg-gradient-to-r from-cyan-500 to-cyan-400 text-slate-950 hover:from-cyan-400 hover:to-cyan-300 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-400/30 active:scale-[0.97]",
-    "secondary": "bg-slate-800/60 text-slate-200 hover:bg-slate-700/70 border border-slate-700/60 hover:border-slate-600 active:scale-[0.97] backdrop-blur-sm",
-    "danger": "bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white border border-red-500/20 hover:border-red-500 active:scale-[0.97]"
-}
+const variantStyles: Record<Variant, string> = {
+  primary:
+    "bg-accent text-accent-fg hover:bg-accent-hover shadow-sm shadow-accent/20 active:scale-[0.98]",
+  secondary:
+    "bg-surface-2 text-fg border border-border hover:border-border-strong hover:bg-elevated active:scale-[0.98]",
+  ghost:
+    "text-muted hover:text-fg hover:bg-surface-2 active:scale-[0.98]",
+  danger:
+    "bg-transparent text-danger border border-border hover:bg-danger/10 hover:border-danger/30 active:scale-[0.98]",
+};
 
-const defaultStyles = "px-5 py-2.5 rounded-xl flex items-center justify-center cursor-pointer font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 group text-sm tracking-wide"
+const sizeStyles: Record<Size, string> = {
+  sm: "px-3 py-1.5 text-xs gap-1.5 rounded-lg",
+  md: "px-4 py-2.5 text-sm gap-2 rounded-xl",
+  lg: "px-5 py-3 text-sm gap-2 rounded-xl",
+};
 
-export const Button = ({ variant, text, startIcon, onClick, fullWidth, isLoading, type = "button" }: ButtonProps) => {
+const base =
+  "inline-flex items-center justify-center font-semibold tracking-tight cursor-pointer transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 group select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
+
+export const Button = ({
+  variant = "primary",
+  size = "md",
+  text,
+  children,
+  startIcon,
+  endIcon,
+  onClick,
+  fullWidth,
+  isLoading,
+  disabled,
+  type = "button",
+  title,
+  "aria-label": ariaLabel,
+}: ButtonProps) => {
   return (
-    <button 
-        type={type}
-        disabled={isLoading}
-        className={`${variantStyles[variant]} ${defaultStyles} ${fullWidth ? "w-full" : ""}`} 
-        onClick={onClick}
-    >    
-        {isLoading ? (
-            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-        ) : (
-            startIcon && <span className="mr-2 group-hover:scale-110 transition-transform duration-200">{startIcon}</span>
-        )}
-        <span> 
-            {isLoading ? "Loading..." : text}
-        </span>
+    <button
+      type={type}
+      title={title}
+      aria-label={ariaLabel}
+      aria-busy={isLoading || undefined}
+      disabled={isLoading || disabled}
+      onClick={onClick}
+      className={`${base} ${variantStyles[variant]} ${sizeStyles[size]} ${fullWidth ? "w-full" : ""}`}
+    >
+      {isLoading ? (
+        <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+      ) : (
+        startIcon && (
+          <span className="transition-transform duration-200 group-hover:scale-110">{startIcon}</span>
+        )
+      )}
+      {(text || children) && <span>{isLoading ? "Working…" : children ?? text}</span>}
+      {!isLoading && endIcon && (
+        <span className="transition-transform duration-200 group-hover:translate-x-0.5">{endIcon}</span>
+      )}
     </button>
-  )
-}
+  );
+};

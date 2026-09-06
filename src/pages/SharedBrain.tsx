@@ -1,158 +1,185 @@
 import { useParams, Link } from "react-router-dom";
-import { useEffect, useState } from "react";
-import api from "../lib/api";
+import { useEffect, useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { LuSearch, LuSparkles, LuX, LuMessageSquare, LuCompass } from "react-icons/lu";
+import { toast } from "sonner";
+
+import api, { errMessage } from "../lib/api";
 import { Card } from "../components/Card";
-import { FaBrain } from "react-icons/fa";
-import { motion } from "framer-motion";
+import { Logo } from "../components/Logo";
+import { ThemeToggle } from "../components/ThemeToggle";
+import { AiSearchPanel } from "../components/AiSearchPanel";
+import { ChatPanel } from "../components/ChatPanel";
+import { EmptyState } from "../components/EmptyState";
+import { Button } from "../components/Button";
 import type { Content } from "../hooks/useContent";
 
 export const SharedBrain = () => {
-    const { hash } = useParams<{ hash: string }>();
-    const [contents, setContents] = useState<Content[]>([]);
-    const [username, setUsername] = useState("");
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState(false);
+  const { hash } = useParams<{ hash: string }>();
+  const [contents, setContents] = useState<Content[]>([]);
+  const [username, setUsername] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-    useEffect(() => {
-        const fetchSharedContent = async () => {
-            try {
-                const res = await api.get(`/api/v1/brain/${hash}`);
-                setContents(res.data.content);
-                setUsername(res.data.username);
-            } catch (err) {
-                console.error("Failed to fetch shared brain", err);
-                setError(true);
-            } finally {
-                setIsLoading(false);
-            }
-        };
+  const [text, setText] = useState("");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiSummary, setAiSummary] = useState("");
+  const [aiMatchedIds, setAiMatchedIds] = useState<string[] | null>(null);
+  const [isAiSearching, setIsAiSearching] = useState(false);
 
-        if (hash) {
-            fetchSharedContent();
-        }
-    }, [hash]);
+  useEffect(() => {
+    if (!hash) return;
+    (async () => {
+      try {
+        const res = await api.get(`/api/v1/brain/${hash}`);
+        setContents(res.data.content ?? []);
+        setUsername(res.data.username ?? "");
+      } catch {
+        setError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    })();
+  }, [hash]);
 
-    if (isLoading) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-                <div className="mesh-gradient" />
-                <div className="noise-overlay" />
-                <div className="relative z-10 flex flex-col items-center gap-4">
-                    <div className="relative">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-violet-500/10 flex items-center justify-center animate-pulse">
-                            <FaBrain className="text-cyan-400 text-2xl" />
-                        </div>
-                        <div className="absolute inset-0 w-14 h-14 rounded-2xl border-2 border-cyan-500/20 border-t-cyan-500 animate-[spin-slow_2s_linear_infinite]" />
-                    </div>
-                    <p className="text-slate-500 text-sm animate-pulse">Loading shared brain...</p>
-                </div>
-            </div>
-        );
+  const filtered = useMemo(() => {
+    let list = contents;
+    const q = text.trim().toLowerCase();
+    if (q) list = list.filter((c) => `${c.title} ${c.link} ${(c.tags ?? []).join(" ")}`.toLowerCase().includes(q));
+    if (aiMatchedIds !== null) list = list.filter((c) => aiMatchedIds.includes(c._id));
+    return list;
+  }, [contents, text, aiMatchedIds]);
+
+  const runAiSearch = async (query: string) => {
+    const q = query.trim();
+    if (!q || isAiSearching) return;
+    setAiQuery(q);
+    setIsAiSearching(true);
+    try {
+      const res = await api.post("/api/v1/ai/search-public", { query: q, hash });
+      setAiMatchedIds(res.data.matchedIds);
+      setAiSummary(res.data.summary);
+    } catch (err) {
+      toast.error(errMessage(err, "AI search failed"));
+    } finally {
+      setIsAiSearching(false);
     }
+  };
 
-    if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">
-                <div className="mesh-gradient" />
-                <div className="noise-overlay" />
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="relative z-10 flex flex-col items-center"
-                >
-                    <div className="p-6 rounded-3xl bg-white/[0.02] border border-slate-800/40 mb-6">
-                        <span className="text-5xl animate-[float_4s_ease-in-out_infinite]">🏜️</span>
-                    </div>
-                    <h1 className="text-2xl font-bold mb-2 text-slate-200">Brain Not Found</h1>
-                    <p className="text-slate-500 text-sm mb-6 max-w-sm">This shared brain link might have expired or doesn't exist anymore.</p>
-                    <Link 
-                        to="/signin" 
-                        className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors font-medium px-5 py-2.5 rounded-xl border border-cyan-500/20 hover:bg-cyan-500/5"
-                    >
-                        Go to Cluttr
-                    </Link>
-                </motion.div>
-            </div>
-        );
-    }
+  const clearAi = () => { setAiMatchedIds(null); setAiSummary(""); setAiQuery(""); };
 
+  if (isLoading) {
     return (
-        <div className="min-h-screen">
-            <div className="mesh-gradient" />
-            <div className="noise-overlay" />
-
-            {/* Responsive navbar */}
-            <nav className="relative z-10 border-b border-slate-800/40 glass sticky top-0">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="p-1.5 rounded-lg bg-gradient-to-br from-cyan-500/15 to-violet-500/10 border border-cyan-500/10">
-                            <FaBrain className="text-cyan-400 text-base sm:text-lg" />
-                        </div>
-                        <h1 className="font-bold text-base sm:text-lg tracking-tight gradient-text">Cluttr</h1>
-                    </div>
-                    <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-white/[0.03] border border-slate-800/50 text-[11px] sm:text-xs text-slate-400">
-                        <span className="hidden sm:inline">Viewing</span>
-                        <span className="text-cyan-400 font-medium">@{username}</span>
-                        <span className="hidden sm:inline">brain</span>
-                    </div>
-                </div>
-            </nav>
-
-            <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-                <motion.header 
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mb-8 sm:mb-10"
-                >
-                    <div className="flex items-center gap-3 mb-3">
-                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center text-white text-sm font-bold uppercase flex-shrink-0">
-                            {username.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100 truncate">
-                                {username}'s Collection
-                            </h2>
-                            <p className="text-slate-500 text-xs sm:text-sm">Curated links and content shared via Cluttr</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 mt-4 text-xs text-slate-500">
-                        <span className="px-2.5 py-1 rounded-full bg-white/[0.03] border border-slate-800/40">
-                            {contents.length} {contents.length === 1 ? 'item' : 'items'}
-                        </span>
-                    </div>
-                </motion.header>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-                    {contents.map((content, index) => (
-                        <motion.div
-                            key={content._id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                        >
-                            <Card 
-                                contentId={content._id}
-                                type={content.type} 
-                                title={content.title} 
-                                link={content.link}
-                            />
-                        </motion.div>
-                    ))}
-                </div>
-
-                {contents.length === 0 && (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex flex-col items-center justify-center py-24"
-                    >
-                        <div className="p-6 rounded-3xl bg-white/[0.02] border border-slate-800/40 mb-6">
-                            <span className="text-5xl opacity-40">📭</span>
-                        </div>
-                        <p className="text-slate-400 text-sm">No public content available in this brain.</p>
-                    </motion.div>
-                )}
-            </main>
+      <div className="grid min-h-screen place-items-center">
+        <div className="ambient" />
+        <div className="relative z-10 flex flex-col items-center gap-4">
+          <div className="grid h-12 w-12 animate-pulse place-items-center rounded-2xl bg-accent-soft">
+            <LuCompass className="animate-[spin-slow_3s_linear_infinite] text-accent" size={22} />
+          </div>
+          <p className="text-sm text-subtle">Loading shared brain…</p>
         </div>
+      </div>
     );
+  }
+
+  if (error) {
+    return (
+      <div className="grid min-h-screen place-items-center p-4">
+        <div className="ambient" />
+        <div className="relative z-10">
+          <EmptyState
+            icon={<LuCompass />}
+            title="Brain not found"
+            description="This shared link may have expired or never existed."
+            action={<Link to="/"><Button variant="primary" text="Go to Cluttr" /></Link>}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen">
+      <div className="ambient" />
+
+      <nav className="glass sticky top-0 z-20 border-b border-border">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <Link to="/" className="transition-opacity hover:opacity-80"><Logo /></Link>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-border bg-surface-2 px-3 py-1.5 text-xs text-muted">
+              <span className="hidden sm:inline">Viewing </span>
+              <span className="font-medium text-accent">@{username}</span>
+            </span>
+            <ThemeToggle />
+          </div>
+        </div>
+      </nav>
+
+      <main className="relative z-10 mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
+        <motion.header initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+          <div className="flex items-center gap-3">
+            <div className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl bg-accent text-base font-bold uppercase text-accent-fg">
+              {username.charAt(0)}
+            </div>
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-bold tracking-tight sm:text-2xl">{username}'s collection</h1>
+              <p className="text-sm text-muted">{contents.length} curated item{contents.length === 1 ? "" : "s"} · shared via Cluttr</p>
+            </div>
+          </div>
+
+          {/* Search + chat */}
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <LuSearch className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-subtle" size={16} />
+              <input
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && text.trim()) runAiSearch(text); }}
+                placeholder="Search, or press Enter to ask AI…"
+                className="w-full rounded-xl border border-border bg-surface-2 py-2.5 pl-10 pr-28 text-sm text-fg placeholder:text-subtle focus:border-accent/50 focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
+                {text && (
+                  <button onClick={() => setText("")} aria-label="Clear search" className="rounded-md p-1 text-subtle hover:text-fg"><LuX size={14} /></button>
+                )}
+                <button onClick={() => runAiSearch(text)} disabled={!text.trim() || isAiSearching}
+                  className="flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-xs font-semibold text-accent-fg transition-all hover:bg-accent-hover disabled:opacity-40">
+                  {isAiSearching ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <LuSparkles size={13} />}
+                  Ask AI
+                </button>
+              </div>
+            </div>
+            <Button variant="secondary" text="Chat" startIcon={<LuMessageSquare size={15} />} onClick={() => setChatOpen(true)} />
+          </div>
+        </motion.header>
+
+        <AnimatePresence>
+          {aiSummary && aiMatchedIds !== null && (
+            <AiSearchPanel summary={aiSummary} matchCount={filtered.length} query={aiQuery} onClear={clearAi} />
+          )}
+        </AnimatePresence>
+
+        {filtered.length === 0 ? (
+          <EmptyState
+            icon={<LuSearch />}
+            title={text || aiMatchedIds !== null ? "No matches" : "Nothing shared yet"}
+            description={text || aiMatchedIds !== null ? "Try different keywords." : "This brain has no public content."}
+            action={(text || aiMatchedIds !== null) && <Button variant="secondary" text="Clear" onClick={() => { setText(""); clearAi(); }} />}
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filtered.map((c, i) => (
+              <motion.div key={c._id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
+                <Card content={c} view="grid" />
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </main>
+
+      <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} contents={contents}
+        endpoint="/api/v1/ai/chat-public" extraPayload={{ hash }} />
+    </div>
+  );
 };
